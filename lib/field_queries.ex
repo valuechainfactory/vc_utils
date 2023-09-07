@@ -1,4 +1,4 @@
-defmodule VcUtils.FieldQueries do
+defmodule VCUtils.FieldQueries do
   @moduledoc """
     Field Queries
 
@@ -7,7 +7,7 @@ defmodule VcUtils.FieldQueries do
     Take the example below;
     ``
       defmodule Identity.Accounts.User do
-        use VcUtils.FieldQueries
+        use VCUtils.FieldQueries
 
         schema "users" do
           field :username, :string
@@ -95,7 +95,7 @@ defmodule VcUtils.FieldQueries do
   defmacro __using__(_opts) do
     quote location: :keep do
       import Ecto.Query, only: [from: 2]
-      import VcUtils.FieldQueries
+      import VCUtils.FieldQueries
     end
   end
 

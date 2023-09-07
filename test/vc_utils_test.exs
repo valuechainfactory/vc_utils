@@ -1,8 +1,8 @@
-defmodule VcUtilsTest do
+defmodule VCUtilsTest do
   use ExUnit.Case
-  doctest VcUtils
+  doctest VCUtils
 
   test "greets the world" do
-    assert VcUtils.hello() == :world
+    assert VCUtils.hello() == :world
   end
 end

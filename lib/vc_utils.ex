@@ -1,6 +1,6 @@
-defmodule VcUtils do
+defmodule VCUtils do
   @moduledoc """
-  Documentation for `VcUtils`.
+  Documentation for `VCUtils`.
   """
 
   @doc """
@@ -8,7 +8,7 @@ defmodule VcUtils do
 
   ## Examples
 
-      iex> VcUtils.hello()
+      iex> VCUtils.hello()
       :world
 
   """

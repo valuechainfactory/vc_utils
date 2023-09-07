@@ -1,4 +1,4 @@
-defmodule VcUtils.MixProject do
+defmodule VCUtils.MixProject do
   use Mix.Project
 
   def project do

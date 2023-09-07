@@ -1,4 +1,4 @@
-defmodule VcUtils.RepoCrud do
+defmodule VCUtils.RepoCrud do
   @moduledoc """
   Repo CRUD Actions
 
@@ -60,7 +60,7 @@ defmodule VcUtils.RepoCrud do
   defmacro __using__(opts) do
     quote location: :keep do
       @repo unquote(opts[:repo])
-      import VcUtils.RepoCrud
+      import VCUtils.RepoCrud
     end
   end
 
