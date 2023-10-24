@@ -26,7 +26,9 @@ defmodule VCUtils.MixProject do
       # -----
 
       {:ecto, "~> 3.10"},
-      {:ecto_sql, "~> 3.10"}
+      {:ecto_sql, "~> 3.10"},
+      {:jason, "~> 1.4.1"},
+      {:finch, "~> 0.16.0"}
     ]
   end
 end
