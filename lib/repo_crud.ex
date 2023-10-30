@@ -19,7 +19,7 @@ defmodule VCUtils.RepoCrud do
       def_crud([
         :create,
         :get,
-        :update,
+        :modify,
         :delete
       ])
     end
@@ -44,8 +44,8 @@ defmodule VCUtils.RepoCrud do
       Repo.get!(__MODULE__, id)
     end
 
-    # update
-    def update(struct, attrs \\ %{}, otps \\ []) do
+    # modify
+    def modify(struct, attrs \\ %{}, otps \\ []) do
       struct
       |> __MODULE__.changeset(attrs)
       |> Repo.update(opts)
@@ -92,8 +92,25 @@ defmodule VCUtils.RepoCrud do
     end
   end
 
+  defp def_crud_action(:modify = action) do
+    quote location: :keep do
+      def unquote(action)(struct, attrs \\ %{}, opts \\ []) do
+        struct
+        |> __MODULE__.changeset(attrs)
+        |> @repo.update(opts)
+      end
+
+      def unquote(:"#{action}!")(struct, attrs \\ %{}, opts \\ []) do
+        struct
+        |> __MODULE__.changeset(attrs)
+        |> @repo.update!(opts)
+      end
+    end
+  end
+
   defp def_crud_action(:update = action) do
     quote location: :keep do
+      @deprecated "User :modify instead of :update"
       def unquote(action)(struct, attrs \\ %{}, opts \\ []) do
         struct
         |> __MODULE__.changeset(attrs)

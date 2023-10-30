@@ -1,18 +1,5 @@
 defmodule VCUtils do
   @moduledoc """
-  Documentation for `VCUtils`.
+  Some behaviours, macros, and utility functions for rapid prototyping.
   """
-
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> VCUtils.hello()
-      :world
-
-  """
-  def hello do
-    :world
-  end
 end

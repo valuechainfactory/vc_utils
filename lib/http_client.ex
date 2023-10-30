@@ -17,13 +17,15 @@ defmodule VCUtils.HTTPClient do
 
       @impl true
       def request(method, url, headers \\ [], body \\ nil) do
-        config = Application.get_env(:http_client, __MODULE__, [])
-        mod = Keyword.get(config, :mod, VCUtils.HTTPClient.Finch)
-        body = if is_map(body), do: Jason.encode!(body), else: body
+        defaults = [adapter: VCUtils.HTTPClient.Finch, serializer: Jason]
+        config = Application.get_env(:http_client, __MODULE__, defaults)
+        adapter = Keyword.get(config, :adapter)
+        serializer = Keyword.get(config, :serializer)
+        body = if is_map(body), do: serializer.encode!(body), else: body
 
         method
-        |> mod.request(url, headers, body)
-        |> process_response()
+        |> adapter.request(url, headers, body)
+        |> process_response(config)
       end
 
       @impl true
@@ -35,32 +37,35 @@ defmodule VCUtils.HTTPClient do
 
   def process_response(tuple, opts \\ [])
 
-  def process_response({:ok, %{status: status, body: body}}, _opts) when status in 200..299 do
-    body |> Jason.decode!(keys: :atoms) |> then(&{:ok, %{status: status, body: &1}})
+  def process_response({:ok, %{status: status, body: body}}, opts) when status in 200..299 do
+    serializer = Keyword.get(opts, :serializer, Jason)
+    body |> serializer.decode!(keys: :atoms) |> then(&{:ok, %{status: status, body: &1}})
   rescue
-    e in Jason.DecodeError ->
+    e ->
       {:error,
        "Error decoding response: \n#{inspect(body, pretty: true)}\n\n#{inspect(e, pretty: true)}"}
   end
 
-  def process_response({:ok, %{status_code: status, body: body}}, _opts)
+  def process_response({:ok, %{status_code: status, body: body}}, opts)
       when status in 200..299 do
-    body |> Jason.decode!(keys: :atoms) |> then(&{:ok, %{status: status, body: &1}})
+    serializer = Keyword.get(opts, :serializer, Jason)
+    body |> serializer.decode!(keys: :atoms) |> then(&{:ok, %{status: status, body: &1}})
   rescue
-    e in Jason.DecodeError ->
+    e ->
       {:error,
        "Error decoding response: \n#{inspect(body, pretty: true)}\n\n#{inspect(e, pretty: true)}"}
   end
 
-  def process_response({:ok, response}, _opts) do
+  def process_response({:ok, response}, opts) do
     status = Map.get(response, :status) || Map.get(response, :status_code)
+    serializer = Keyword.get(opts, :serializer, Jason)
 
     {:error,
      response.body
-     |> Jason.decode!(keys: :atoms)
+     |> serializer.decode!(keys: :atoms)
      |> then(&%{status: status, body: &1})}
   rescue
-    e in Jason.DecodeError ->
+    e  ->
       Logger.error(
         "[#{__MODULE__}] Error decoding response: \n#{inspect(response.body, pretty: true)}\n\n#{inspect(e, pretty: true)}"
       )
