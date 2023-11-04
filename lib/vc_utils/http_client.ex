@@ -6,14 +6,14 @@ defmodule VCUtils.HTTPClient do
               {:ok, any()} | {:error, any()}
 
   @callback auth_headers :: Keyword.t()
-  @callback process_response({:ok | :error, struct}) :: {:ok | :error, struct}
+  @callback process_response({:ok | :error, struct}, Keyword.t()) :: {:ok | :error, struct}
 
-  @optional_callbacks [auth_headers: 0, process_response: 1, request: 4]
+  @optional_callbacks [auth_headers: 0, process_response: 2, request: 4]
 
   defmacro __using__(_opts) do
     quote location: :keep do
       @behaviour VCUtils.HTTPClient
-      import VCUtils.HTTPClient, only: [process_response: 1]
+      import VCUtils.HTTPClient, only: [process_response: 2]
 
       @impl true
       def request(method, url, headers \\ [], body \\ nil) do
@@ -65,7 +65,7 @@ defmodule VCUtils.HTTPClient do
      |> serializer.decode!(keys: :atoms)
      |> then(&%{status: status, body: &1})}
   rescue
-    e  ->
+    e ->
       Logger.error(
         "[#{__MODULE__}] Error decoding response: \n#{inspect(response.body, pretty: true)}\n\n#{inspect(e, pretty: true)}"
       )
