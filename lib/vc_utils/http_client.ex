@@ -2,13 +2,13 @@ defmodule VCUtils.HTTPClient do
   require Logger
   @type method() :: :get | :post | :head | :patch | :delete | :options | :put | String.t()
 
-  @callback request(method(), String.t(), Keyword.t(), String.t() | nil) ::
+  @callback request(method(), String.t(), Keyword.t() | [], String.t() | nil, Keyword.t() | []) ::
               {:ok, any()} | {:error, any()}
 
   @callback auth_headers :: Keyword.t()
   @callback process_response({:ok | :error, struct}, Keyword.t()) :: {:ok | :error, struct}
 
-  @optional_callbacks [auth_headers: 0, process_response: 2, request: 4]
+  @optional_callbacks [auth_headers: 0, process_response: 2, request: 5]
 
   defmacro __using__(_opts) do
     quote location: :keep do
@@ -16,7 +16,7 @@ defmodule VCUtils.HTTPClient do
       import VCUtils.HTTPClient, only: [process_response: 2]
 
       @impl true
-      def request(method, url, headers \\ [], body \\ nil) do
+      def request(method, url, headers \\ [], body \\ nil, opts \\ []) do
         defaults = [adapter: VCUtils.HTTPClient.Finch, serializer: Jason]
         config = Application.get_env(:http_client, __MODULE__, defaults)
         adapter = Keyword.get(config, :adapter)
@@ -24,14 +24,14 @@ defmodule VCUtils.HTTPClient do
         body = if is_map(body), do: serializer.encode!(body), else: body
 
         method
-        |> adapter.request(url, headers, body)
+        |> adapter.request(url, headers, body, opts)
         |> process_response(config)
       end
 
       @impl true
       def auth_headers, do: []
 
-      defoverridable request: 4, auth_headers: 0
+      defoverridable request: 5, auth_headers: 0
     end
   end
 
