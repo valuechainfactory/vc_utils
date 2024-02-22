@@ -18,6 +18,8 @@ defmodule VCUtils.HTTPClient do
 
       @impl true
       def request(method, url, headers \\ [], body \\ nil, opts \\ [])
+
+      def request(method, url, headers, body, opts)
           when is_list(headers) and (is_binary(body) or is_nil(body)) do
         Logger.warning("""
           Invalid order of arguments, instead call request/5 with the following order:
@@ -25,10 +27,11 @@ defmodule VCUtils.HTTPClient do
 
           ...the body and headers arguments were swapped.
         """)
+
         request(method, url, body, headers, opts)
       end
 
-      def request(method, url, body \\ nil, headers \\ [], opts \\ []) do
+      def request(method, url, body, headers, opts) do
         defaults = [adapter: VCUtils.HTTPClient.Finch, serializer: Jason]
         config = Application.get_env(:http_client, __MODULE__, defaults)
         adapter = Keyword.get(config, :adapter)
@@ -36,7 +39,7 @@ defmodule VCUtils.HTTPClient do
         body = if is_map(body), do: serializer.encode!(body), else: body
 
         method
-        |> adapter.request(url,  body, headers, opts)
+        |> adapter.request(url, body, headers, opts)
         |> process_response(config)
       end
 
