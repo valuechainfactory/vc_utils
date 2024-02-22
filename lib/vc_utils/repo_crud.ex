@@ -7,7 +7,7 @@ defmodule VCUtils.RepoCrud do
   Example:
   ```elixir
     defmodule User do
-      use Utils.RepoCrud, repo: Boma.Repo
+      use Utils.RepoCrud, repo: MyApp.Repo
 
       schema "users" do
         field :username, :string
