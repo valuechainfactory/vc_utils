@@ -2,7 +2,7 @@ defmodule VCUtils.HTTPClient do
   require Logger
   @type method() :: :get | :post | :head | :patch | :delete | :options | :put | String.t()
 
-  @callback request(method(), String.t(), Keyword.t() | [], String.t() | nil, Keyword.t() | []) ::
+  @callback request(method(), String.t(), String.t() | nil, Keyword.t() | [],  Keyword.t() | []) ::
               {:ok, any()} | {:error, any()}
 
   @callback auth_headers :: Keyword.t()
@@ -27,16 +27,17 @@ defmodule VCUtils.HTTPClient do
 
           ...the body and headers arguments were swapped.
         """)
-
         request(method, url, body, headers, opts)
       end
 
       def request(method, url, body, headers, opts) do
-        defaults = [adapter: VCUtils.HTTPClient.Finch, serializer: Jason]
+        defaults = [adapter: VCUtils.HTTPClient.Finch, serializer: Jason, log_level: :debug]
         config = Application.get_env(:http_client, __MODULE__, defaults)
+        config = Keyword.merge(defaults, config)
         adapter = Keyword.get(config, :adapter)
         serializer = Keyword.get(config, :serializer)
         body = if is_map(body), do: serializer.encode!(body), else: body
+        log(method, url, body, headers, opts, config)
 
         method
         |> adapter.request(url, body, headers, opts)
@@ -45,6 +46,36 @@ defmodule VCUtils.HTTPClient do
 
       @impl true
       def auth_headers, do: []
+
+      defp log(method, url, body, headers, opts, config) do
+        level = Keyword.get(config, :log_level)
+
+        log = """
+        [#{__MODULE__}] Request log
+
+        Method: #{method}
+        URL: #{url}
+        Headers: \n#{inspect(headers, pretty: true)}
+
+        Body: \n#{inspect(body, pretty: true)}
+
+        Options: \n#{inspect(opts, pretty: true)}
+
+        [#{__MODULE__}] End request log
+        """
+
+        with false <- is_boolean(level),
+             true <- level in ~w(debug info warning error)a do
+          case level do
+            :debug -> Logger.debug(log)
+            :info -> Logger.info(log)
+            :warning -> Logger.warning(log)
+            :error -> Logger.error(log)
+          end
+        else
+          level when is_boolean(level) -> :ok
+        end
+      end
 
       defoverridable request: 5, auth_headers: 0
     end
