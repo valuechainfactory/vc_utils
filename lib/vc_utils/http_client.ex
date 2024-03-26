@@ -78,6 +78,8 @@ defmodule VCUtils.HTTPClient do
         else
           level when is_boolean(level) -> :ok
         end
+
+        response
       end
 
       defoverridable request: 5, auth_headers: 0
