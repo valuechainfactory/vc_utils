@@ -2,7 +2,7 @@ defmodule VCUtils.HTTPClient do
   require Logger
   @type method() :: :get | :post | :head | :patch | :delete | :options | :put | String.t()
 
-  @callback request(method(), String.t(), String.t() | nil, Keyword.t() | [],  Keyword.t() | []) ::
+  @callback request(method(), String.t(), String.t() | nil, Keyword.t() | [], Keyword.t() | []) ::
               {:ok, any()} | {:error, any()}
 
   @callback auth_headers :: Keyword.t()
@@ -27,6 +27,7 @@ defmodule VCUtils.HTTPClient do
 
           ...the body and headers arguments were swapped.
         """)
+
         request(method, url, body, headers, opts)
       end
 
@@ -37,17 +38,17 @@ defmodule VCUtils.HTTPClient do
         adapter = Keyword.get(config, :adapter)
         serializer = Keyword.get(config, :serializer)
         body = if is_map(body), do: serializer.encode!(body), else: body
-        log(method, url, body, headers, opts, config)
 
         method
         |> adapter.request(url, body, headers, opts)
         |> process_response(config)
+        |> log(method, url, body, headers, opts, config)
       end
 
       @impl true
       def auth_headers, do: []
 
-      defp log(method, url, body, headers, opts, config) do
+      defp log(response, method, url, body, headers, opts, config) do
         level = Keyword.get(config, :log_level)
 
         log = """
@@ -60,6 +61,8 @@ defmodule VCUtils.HTTPClient do
         Body: \n#{inspect(body, pretty: true)}
 
         Options: \n#{inspect(opts, pretty: true)}
+
+        Response: \n#{inspect(response, pretty: true)}
 
         [#{__MODULE__}] End request log
         """
