@@ -32,17 +32,20 @@ defmodule VCUtils.HTTPClient do
       end
 
       def request(method, url, body, headers, opts) do
-        defaults = [adapter: VCUtils.HTTPClient.Finch, serializer: Jason, log_level: :debug]
-        config = Application.get_env(:http_client, __MODULE__, defaults)
-        config = Keyword.merge(defaults, config)
-        adapter = Keyword.get(config, :adapter)
-        serializer = Keyword.get(config, :serializer)
-        body = if is_map(body), do: serializer.encode!(body), else: body
+        :timer.tc(fn ->
+          defaults = [adapter: VCUtils.HTTPClient.Finch, serializer: Jason, log_level: :debug]
+          config = Application.get_env(:http_client, __MODULE__, defaults)
+          config = Keyword.merge(defaults, config)
+          adapter = Keyword.get(config, :adapter)
+          serializer = Keyword.get(config, :serializer)
+          body = if is_map(body), do: serializer.encode!(body), else: body
 
-        method
-        |> adapter.request(url, body, headers, opts)
-        |> process_response(config)
-        |> log(method, url, body, headers, opts, config)
+          method
+          |> adapter.request(url, body, headers, opts)
+          |> process_response(config)
+          |> log(method, url, body, headers, opts, config)
+        end)
+        |> format_timer()
       end
 
       @impl true
@@ -78,6 +81,21 @@ defmodule VCUtils.HTTPClient do
         else
           level when is_boolean(level) -> :ok
         end
+
+        response
+      end
+
+      defp format_timer({time, response}) do
+        human =
+          time
+          |> Timex.Duration.from_microseconds()
+          |> Timex.Format.Duration.Formatters.Humanized.format()
+
+        Logger.warning("""
+
+        [#{__MODULE__}] API call took: #{human}
+
+        """)
 
         response
       end
