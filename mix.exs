@@ -30,7 +30,8 @@ defmodule VCUtils.MixProject do
       {:ecto, "~> 3.11"},
       {:ecto_sql, "~> 3.11"},
       {:jason, "~> 1.4.1"},
-      {:finch, "~> 0.18.0"}
+      {:finch, "~> 0.18.0"},
+      {:timex, "~> 3.7.11"}
     ]
   end
 end

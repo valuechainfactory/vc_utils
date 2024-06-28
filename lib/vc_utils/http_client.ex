@@ -32,10 +32,11 @@ defmodule VCUtils.HTTPClient do
       end
 
       def request(method, url, body, headers, opts) do
+        defaults = [adapter: VCUtils.HTTPClient.Finch, serializer: Jason, log_level: :debug]
+        config = Application.get_env(:http_client, __MODULE__, defaults)
+        config = Keyword.merge(defaults, config)
+
         :timer.tc(fn ->
-          defaults = [adapter: VCUtils.HTTPClient.Finch, serializer: Jason, log_level: :debug]
-          config = Application.get_env(:http_client, __MODULE__, defaults)
-          config = Keyword.merge(defaults, config)
           adapter = Keyword.get(config, :adapter)
           serializer = Keyword.get(config, :serializer)
           body = if is_map(body), do: serializer.encode!(body), else: body
@@ -45,6 +46,7 @@ defmodule VCUtils.HTTPClient do
           |> process_response(config)
           |> log(method, url, body, headers, opts, config)
         end)
+        |> log_telemetry_async(method, url, body, headers, opts, config)
         |> format_timer()
       end
 
@@ -82,6 +84,20 @@ defmodule VCUtils.HTTPClient do
           level when is_boolean(level) -> :ok
         end
 
+        response
+      end
+
+      defp log_telemetry({time, response}, method, url, body, headers, opts, config) do
+        with listener = Keyword.get(config, :telemetry_listener),
+             true <- not is_nil(listener),
+             pid = (is_atom(listener) && Process.whereis(listener)) || listener,
+             true <- is_pid(pid) do
+          send(pid, {:http_request, {time, response}, method, url, body, headers, opts})
+        end
+      end
+
+      defp log_telemetry_async(response, method, url, body, headers, opts, config) do
+        Task.start(fn -> log_telemetry(response, method, url, body, headers, opts, config) end)
         response
       end
 
