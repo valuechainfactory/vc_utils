@@ -13,16 +13,24 @@ defmodule VCUtils.Application do
 
   @impl true
   def start(_type, _args) do
+    default = [
+      name: VCUtils.Finch,
+      pools: %{
+        default: [
+          size: 1000,
+          start_pool_metrics?: true,
+          conn_opts: [transport_opts: [verify: @ca_verify]]
+        ]
+      }
+    ]
+
+    opts = Application.get_env(:vc_utils, :finch_options, default)
+
     children = [
       # Starts a worker by calling: VCUtils.Worker.start_link(arg)
       # {VCUtils.Worker, arg}
 
-      {
-        Finch,
-        name: VCUtils.Finch,
-        pools: %{default: [conn_opts: [transport_opts: [verify: @ca_verify]]]},
-        pools: ca_unverified_opts()
-      }
+      {Finch, opts}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
@@ -31,9 +39,9 @@ defmodule VCUtils.Application do
     Supervisor.start_link(children, opts)
   end
 
-  defp ca_unverified_opts() do
-    :vc_utils
-    |> Application.get_env(:ca_unverified, [])
-    |> Enum.reduce(%{}, fn {host, conn_opts}, acc -> Map.put(acc, host, conn_opts: conn_opts) end)
-  end
+  # defp ca_unverified_opts() do
+  #   :vc_utils
+  #   |> Application.get_env(:ca_unverified, [])
+  #   |> Enum.reduce(%{}, fn {host, conn_opts}, acc -> Map.put(acc, host, conn_opts: conn_opts) end)
+  # end
 end
