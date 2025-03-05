@@ -33,7 +33,7 @@ defmodule VCUtils.HTTPClient do
 
       def request(method, url, body, headers, opts) do
         defaults = [adapter: VCUtils.HTTPClient.Finch, serializer: Jason, log_level: :debug]
-        config = Application.get_env(:http_client, __MODULE__, defaults)
+        config = Application.get_env(:vc_utils, __MODULE__, defaults)
         config = Keyword.merge(defaults, config)
 
         :timer.tc(fn ->
