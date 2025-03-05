@@ -1,94 +1,240 @@
 defmodule VCUtils.FieldQueries do
   @moduledoc """
-    Field Queries
+    # Field Queries
 
-    Generates functions that add filters for fields provided in the call to the macro `defbyq`
+    Provides macros to generate query functions for filtering by fields and preloading associations.
 
-    Take the example below;
-    ``
-      defmodule Identity.Accounts.User do
-        use VCUtils.FieldQueries
+    ## Overview
 
-        schema "users" do
-          field :username, :string
-          field(:first_name, :string)
-          field(:last_name, :string)
-          field(:other_names, :string)
-          field(:email, :string)
-          field(:msisdn, :string)
+    This module adds two primary macros:
 
-          timestamps()
-          ...
-        end
+    - `defbyq/1`: Generates query functions for filtering by fields with various conditions
+    - `defpreloadq/1`: Generates query functions for preloading associations with joins
 
-        defbyq([
-          {:first_name, :search},
-          :email,
-          {:inserted_at, :date}
-        ])
+    The generated functions can be used for building complex queries with minimal boilerplate.
 
-      end
-    ``
+    ## Named Bindings Support
 
-    This implementation will yield the functions below
+    Version 2.0 adds support for named bindings, allowing you to:
 
-    ``
-      # {:first_name, :search},
-      def by_first_name_query(queryable \\ __MODULE__, field)
-      def by_first_name_query(queryable, field) when field in ["", nil, []], do: queryable
-      def by_first_name_query(queryable, field) do
-        from(q in queryable, where: ilike(field(q, ^field), ^"%\#{field}%"))
-      end
+    - Filter by fields in joined associations
+    - Create more maintainable and flexible queries
+    - Combine multiple filters across related schemas
 
-      # :email,
-      def by_email_query(queryable \\ __MODULE__, field)
-      def by_email_query(queryable, field) when field in ["", nil, []], do: queryable
-      def by_email_query(queryable, field) do
-        from(q in queryable, where: field(q, ^field) in ^fields)
-      end
-      def by_email_query(queryable, field), do: apply(__module__, :by_email_query, [[field]])
+    ## Basic Usage
 
-      # {:inserted_at, :date}
-      def by_inserted_at_query(queryable \\ __MODULE__, start_and_end_dates)
-      def by_inserted_at_query(queryable, %{start_date: nil, end_date: nil}), do: queryable
-      def by_inserted_at_query(queryable, %{start_date: start_date, end_date: nil}) do
-        from(q in queryable, where: field(q, ^field) >= ^start_date)
-      end
-      def by_inserted_at_query(queryable, %{start_date: nil, end_date: end_date}) do
-        from(q in queryable, where: field(q, ^field) <= ^end_date)
-      end
-      def by_inserted_at_query(queryable, %{start_date: start_date, end_date: end_date}) do
-        from(q in queryable,
-          where: field(q, ^field) >= ^start_date,
-          where: field(q, ^field) <= ^end_date
-        )
-      end
-    ``
+    First, include this module in your schema:
 
-    Preloads
+    ```elixir
 
-    Association preloads can also be defined with the macro `defpreloadq`, as in the example below:
+    defmodule MyApp.Accounts.User do
+      use VCUtils.FieldQueries
+      # ... rest of your schema
+    end
 
-    ``
+    ```
+
+    ### Defining Field Queries
+
+    Use the `defbyq/1` macro to define query functions for your fields:
+
+    ```elixir
+    defmodule MyApp.Accounts.User do
+      use VCUtils.FieldQueries
+      use Ecto.Schema
+
       schema "users" do
-        field :username, :string
-        has_one :profile, MyApp.Profile
+        field :first_name, :string
+        field :last_name, :string
+        field :email, :string
+        field :active, :boolean
+        field :joined_on, :date
+        has_one :profile, MyApp.Accounts.Profile
+
+        timestamps()
       end
 
+      # Define query functions for these fields
+      defbyq([
+        {:first_name, :search},  # String search with LIKE
+        :email,                  # Standard equality matching
+        {:active, :boolean},     # Boolean field
+        {:joined_on, :date}      # Date range queries
+      ])
+
+      # Define preload query for association
       defpreloadq([:profile])
-    ``
+    end
+    ```
 
-    ...this would define a function as follows.
+    ### Generated Functions
 
-    ``
-      # :profile
-      def preload_profile_query(queryable \\ __MODULE__, join_type)
-          when join_type in [:cross, :full, :inner, :inner_lateral, :left, :left_lateral, :right] do
-        queryable
-        |> join(join_type, [q], f in assoc(q, unquote(field)), as: unquote(field))
-        |> preload([q, {unquote(field), f}], [{unquote(field), f}])
+    For each field in `defbyq`, corresponding query functions will be generated:
+
+    #### Standard Field (e.g., `:email`)
+
+    ```elixir
+    # Single value
+    User.by_email_query("john@example.com")
+    # Multiple values
+    User.by_email_query(["john@example.com", "jane@example.com"])
+    ```
+
+    #### Search Field (e.g., `{:first_name, :search}`)
+
+    ```elixir
+    # Generates a LIKE query with wildcards
+    User.by_first_name_query("john")  # WHERE first_name LIKE '%john%'
+    ```
+
+    #### Boolean Field (e.g., `{:active, :boolean}`)
+
+    ```elixir
+    # Generic query with any boolean value
+    User.by_active_query(true)
+    User.by_active_query(false)
+
+    # Specific queries for true/false
+    User.is_active_query()
+    User.is_not_active_query()
+    ```
+
+    #### Date Field (e.g., `{:joined_on, :date}`)
+
+    ```elixir
+    # Between two dates
+    User.by_joined_on_query(%{start_date: ~D[2023-01-01], end_date: ~D[2023-12-31]})
+
+    # From a date onwards
+    User.by_joined_on_query(%{start_date: ~D[2023-01-01], end_date: nil})
+
+    # Until a date
+    User.by_joined_on_query(%{start_date: nil, end_date: ~D[2023-12-31]})
+    ```
+
+    ### Preload Queries
+
+    For each association in `defpreloadq`, a preload query function will be generated with a named binding:
+
+    ```elixir
+    # Preload profile with an inner join using named binding :profile
+    User.preload_profile_query(:inner)
+    ```
+
+    ## Using Named Bindings
+
+    The real power comes when combining queries with named bindings:
+
+    ```elixir
+    defmodule MyApp.Accounts.Profile do
+      use VCUtils.FieldQueries
+      use Ecto.Schema
+
+      schema "profiles" do
+        field :bio, :string
+        field :theme, :string
+        field :locale, :string
+        belongs_to :user, MyApp.Accounts.User
+
+        timestamps()
       end
-    ``
+
+      defbyq([
+        {:theme, :search},
+        :locale
+      ])
+    end
+    ```
+
+    Now you can filter on joined associations using the named binding:
+
+    ```elixir
+    # Find users with emails matching "example.com" who have a "dark" theme
+    # in their profile
+    query =
+      User
+      |> User.by_email_query("example.com")
+      |> User.preload_profile_query(:inner)
+      |> Profile.by_theme_query("dark", :profile)
+      |> Repo.all()
+    ```
+
+    The third parameter to any query function is an optional named binding.
+    When provided, the filter applies to the field from the associated schema
+    instead of the primary schema.
+
+    ## Complete Example
+
+    ```elixir
+    # Schemas
+    defmodule MyApp.Blog.Post do
+      use VCUtils.FieldQueries
+      use Ecto.Schema
+
+      schema "posts" do
+        field :title, :string
+        field :body, :text
+        field :published, :boolean
+        field :published_at, :utc_datetime
+
+        belongs_to :author, MyApp.Accounts.User
+        has_many :comments, MyApp.Blog.Comment
+
+        timestamps()
+      end
+
+      defbyq([
+        {:title, :search},
+        {:published, :boolean},
+        {:published_at, :date}
+      ])
+
+      defpreloadq([:author, :comments])
+    end
+
+    defmodule MyApp.Blog.Comment do
+      use VCUtils.FieldQueries
+      use Ecto.Schema
+
+      schema "comments" do
+        field :content, :text
+        field :approved, :boolean
+
+        belongs_to :post, MyApp.Blog.Post
+        belongs_to :user, MyApp.Accounts.User
+
+        timestamps()
+      end
+
+      defbyq([
+        {:content, :search},
+        {:approved, :boolean}
+      ])
+    end
+
+    # Query Example: Find all published posts with approved comments
+    # containing the word "awesome"
+    query =
+      Post
+      |> Post.is_published_query()
+      |> Post.preload_comments_query(:inner)
+      |> Comment.is_approved_query(:comments)
+      |> Comment.by_content_query("awesome", :comments)
+      |> Repo.all()
+    ```
+
+    ## How It Works
+
+    The `defbyq` macro generates functions that append `where` clauses to your queries.
+
+    The `defpreloadq` macro generates functions that join and preload the specified association
+    with a named binding. This named binding can then be used in subsequent query functions.
+
+    All generated functions follow a standard pattern:
+
+    - They accept an optional Ecto queryable as the first parameter
+    - They return a query that can be further composed
+    - Functions from `defbyq` support an optional binding parameter to target joined schemas
   """
   import Ecto.Query
 
@@ -153,15 +299,15 @@ defmodule VCUtils.FieldQueries do
     name = :"by_#{field}_query"
 
     quote location: :keep do
-      def unquote(truthy_name)(queryable \\ __MODULE__) do
+      def unquote(truthy_name)(queryable \\ __MODULE__, named_binding \\ nil) do
         from(q in queryable, where: field(q, ^unquote(field)))
       end
 
-      def unquote(falsy_name)(queryable \\ __MODULE__) do
+      def unquote(falsy_name)(queryable \\ __MODULE__, named_binding \\ nil) do
         from(q in queryable, where: not field(q, ^unquote(field)))
       end
 
-      def unquote(name)(queryable \\ __MODULE__, term) do
+      def unquote(name)(queryable \\ __MODULE__, term, named_binding \\ nil) do
         case term do
           t when t in [true, "true"] -> apply(__ENV__.module, unquote(truthy_name), [queryable])
           t when t in [false, "false"] -> apply(__ENV__.module, unquote(falsy_name), [queryable])
