@@ -26,12 +26,10 @@ defmodule VCUtils.FieldQueries do
     First, include this module in your schema:
 
     ```elixir
-
     defmodule MyApp.Accounts.User do
       use VCUtils.FieldQueries
       # ... rest of your schema
     end
-
     ```
 
     ### Defining Field Queries
@@ -250,88 +248,137 @@ defmodule VCUtils.FieldQueries do
     for field <- fields, do: define_field_funs(field)
   end
 
+  # For date fields with optional binding
   defp define_field_funs({field, :date}) when is_atom(field) do
     name = :"by_#{field}_query"
 
     quote location: :keep do
-      def unquote(name)(queryable \\ __MODULE__, start_and_end_dates)
+      # Without binding (uses default binding)
+      def unquote(name)(queryable \\ __MODULE__, start_and_end_dates, binding \\ nil)
 
-      def unquote(name)(queryable, start_and_end_dates) when start_and_end_dates in [nil, ""],
+      def unquote(name)(queryable, start_and_end_dates, _binding) when start_and_end_dates in [nil, ""],
         do: queryable
 
-      def unquote(name)(queryable, %{start_date: nil, end_date: nil}), do: queryable
+      def unquote(name)(queryable, %{start_date: nil, end_date: nil}, _binding), do: queryable
 
-      def unquote(name)(queryable, %{start_date: start_date, end_date: nil}) do
+      def unquote(name)(queryable, %{start_date: start_date, end_date: nil}, nil) do
         from(q in queryable, where: field(q, ^unquote(field)) >= ^start_date)
       end
 
-      def unquote(name)(queryable, %{start_date: nil, end_date: end_date}) do
+      def unquote(name)(queryable, %{start_date: nil, end_date: end_date}, nil) do
         from(q in queryable, where: field(q, ^unquote(field)) <= ^end_date)
       end
 
-      def unquote(name)(queryable, %{start_date: start_date, end_date: end_date}) do
+      def unquote(name)(queryable, %{start_date: start_date, end_date: end_date}, nil) do
         from(q in queryable,
           where: field(q, ^unquote(field)) >= ^start_date,
           where: field(q, ^unquote(field)) <= ^end_date
         )
       end
-    end
-  end
 
-  defp define_field_funs({field, :search}) when is_atom(field) do
-    name = :"by_#{field}_query"
+      # With named binding
+      def unquote(name)(queryable, %{start_date: start_date, end_date: nil}, binding) when is_atom(binding) do
+        from(q in queryable, where: field(as(^binding), ^unquote(field)) >= ^start_date)
+      end
 
-    quote location: :keep do
-      def unquote(name)(queryable \\ __MODULE__, field)
+      def unquote(name)(queryable, %{start_date: nil, end_date: end_date}, binding) when is_atom(binding) do
+        from(q in queryable, where: field(as(^binding), ^unquote(field)) <= ^end_date)
+      end
 
-      def unquote(name)(queryable, field) when field in ["", nil, []],
-        do: queryable
-
-      def unquote(name)(queryable, field) do
-        from(q in queryable, where: ilike(field(q, ^unquote(field)), ^"%#{field}%"))
+      def unquote(name)(queryable, %{start_date: start_date, end_date: end_date}, binding) when is_atom(binding) do
+        from(q in queryable,
+          where: field(as(^binding), ^unquote(field)) >= ^start_date,
+          where: field(as(^binding), ^unquote(field)) <= ^end_date
+        )
       end
     end
   end
 
+  # For search fields with optional binding
+  defp define_field_funs({field, :search}) when is_atom(field) do
+    name = :"by_#{field}_query"
+
+    quote location: :keep do
+      def unquote(name)(queryable \\ __MODULE__, field, binding \\ nil)
+
+      def unquote(name)(queryable, field, _binding) when field in ["", nil, []],
+        do: queryable
+
+      # Without binding (uses default binding)
+      def unquote(name)(queryable, field, nil) do
+        from(q in queryable, where: ilike(field(q, ^unquote(field)), ^"%#{field}%"))
+      end
+
+      # With named binding
+      def unquote(name)(queryable, field, binding) when is_atom(binding) do
+        from(q in queryable, where: ilike(field(as(^binding), ^unquote(field)), ^"%#{field}%"))
+      end
+    end
+  end
+
+  # For boolean fields with optional binding
   defp define_field_funs({field, :boolean}) when is_atom(field) do
     truthy_name = :"is_#{field}_query"
     falsy_name = :"is_not_#{field}_query"
     name = :"by_#{field}_query"
 
     quote location: :keep do
-      def unquote(truthy_name)(queryable \\ __MODULE__, named_binding \\ nil) do
+      # Without binding
+      def unquote(truthy_name)(queryable \\ __MODULE__, binding \\ nil)
+
+      def unquote(truthy_name)(queryable, nil) do
         from(q in queryable, where: field(q, ^unquote(field)))
       end
 
-      def unquote(falsy_name)(queryable \\ __MODULE__, named_binding \\ nil) do
+      def unquote(truthy_name)(queryable, binding) when is_atom(binding) do
+        from(q in queryable, where: field(as(^binding), ^unquote(field)))
+      end
+
+      def unquote(falsy_name)(queryable \\ __MODULE__, binding \\ nil)
+
+      def unquote(falsy_name)(queryable, nil) do
         from(q in queryable, where: not field(q, ^unquote(field)))
       end
 
-      def unquote(name)(queryable \\ __MODULE__, term, named_binding \\ nil) do
+      def unquote(falsy_name)(queryable, binding) when is_atom(binding) do
+        from(q in queryable, where: not field(as(^binding), ^unquote(field)))
+      end
+
+      def unquote(name)(queryable \\ __MODULE__, term, binding \\ nil) do
         case term do
-          t when t in [true, "true"] -> apply(__ENV__.module, unquote(truthy_name), [queryable])
-          t when t in [false, "false"] -> apply(__ENV__.module, unquote(falsy_name), [queryable])
+          t when t in [true, "true"] -> apply(__ENV__.module, unquote(truthy_name), [queryable, binding])
+          t when t in [false, "false"] -> apply(__ENV__.module, unquote(falsy_name), [queryable, binding])
           _ -> queryable
         end
       end
     end
   end
 
+  # For standard fields with optional binding
   defp define_field_funs(field) when is_atom(field) do
     name = :"by_#{field}_query"
 
     quote location: :keep do
-      def unquote(name)(queryable \\ __MODULE__, field)
+      def unquote(name)(queryable \\ __MODULE__, field, binding \\ nil)
 
-      def unquote(name)(queryable, field) when field in ["", nil, []],
+      def unquote(name)(queryable, field, _binding) when field in ["", nil, []],
         do: queryable
 
-      def unquote(name)(queryable, [_ | _] = fields) do
+      # Without binding
+      def unquote(name)(queryable, [_ | _] = fields, nil) do
         from(q in queryable, where: field(q, ^unquote(field)) in ^fields)
       end
 
-      def unquote(name)(queryable, field),
-        do: apply(__ENV__.module, unquote(name), [queryable, [field]])
+      def unquote(name)(queryable, field, nil),
+        do: apply(__ENV__.module, unquote(name), [queryable, [field], nil])
+
+      # With named binding
+      def unquote(name)(queryable, [_ | _] = fields, binding) when is_atom(binding) do
+        from(q in queryable, where: field(as(^binding), ^unquote(field)) in ^fields)
+      end
+
+      def unquote(name)(queryable, field, binding) when is_atom(binding),
+        do: apply(__ENV__.module, unquote(name), [queryable, [field], binding])
     end
   end
 
