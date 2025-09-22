@@ -5,7 +5,7 @@ defmodule VCUtils.HTTPClient do
   @callback request(method(), String.t(), String.t() | nil, Keyword.t() | [], Keyword.t() | []) ::
               {:ok, any()} | {:error, any()}
 
-  @callback auth_headers :: Keyword.t()
+  @callback auth_headers() :: list(tuple())
   @callback process_response({:ok | :error, struct}, Keyword.t()) :: {:ok | :error, struct}
 
   @optional_callbacks [auth_headers: 0, process_response: 2, request: 5]
@@ -32,7 +32,13 @@ defmodule VCUtils.HTTPClient do
       end
 
       def request(method, url, body, headers, opts) do
-        defaults = [adapter: VCUtils.HTTPClient.Finch, serializer: Jason, log_level: :debug]
+        defaults = [
+          adapter: VCUtils.HTTPClient.Finch,
+          serializer: Jason,
+          log_level: :debug,
+          keys: :atoms
+        ]
+
         config = Application.get_env(:vc_utils, __MODULE__, defaults)
         config = Keyword.merge(defaults, config)
 
@@ -43,18 +49,18 @@ defmodule VCUtils.HTTPClient do
 
           method
           |> adapter.request(url, body, headers, opts)
-          |> process_response(config)
           |> log(method, url, body, headers, opts, config)
+          |> process_response(config)
         end)
         |> log_telemetry_async(method, url, body, headers, opts, config)
-        |> format_timer()
+        |> format_timer(url)
       end
 
       @impl true
-      def auth_headers, do: []
+      def auth_headers, do: [{"Content-Type", "application/json"}]
 
       defp log(response, method, url, body, headers, opts, config) do
-        level = Keyword.get(config, :log_level)
+        level = Keyword.get(config, :log_level, :warning)
 
         log = """
         [#{__MODULE__}] Request log
@@ -73,13 +79,8 @@ defmodule VCUtils.HTTPClient do
         """
 
         with false <- is_boolean(level),
-             true <- level in ~w(debug info warning error)a do
-          case level do
-            :debug -> Logger.debug(log)
-            :info -> Logger.info(log)
-            :warning -> Logger.warning(log)
-            :error -> Logger.error(log)
-          end
+             true <- level in ~w(debug info warning error none)a do
+          Logger.log(level, log)
         else
           level when is_boolean(level) -> :ok
         end
@@ -101,17 +102,14 @@ defmodule VCUtils.HTTPClient do
         response
       end
 
-      defp format_timer({time, response}) do
+      defp format_timer({time, response}, url) do
         human =
           time
           |> Timex.Duration.from_microseconds()
           |> Timex.Format.Duration.Formatters.Humanized.format()
 
-        Logger.warning("""
-
-        [#{__MODULE__}] API call took: #{human}
-
-        """)
+        "[#{__MODULE__}] Recieved #{response |> elem(1) |> Map.get(:status)} for #{url |> URI.parse() |> Map.get(:path)} in #{human}"
+        |> Logger.warning()
 
         response
       end
@@ -124,7 +122,7 @@ defmodule VCUtils.HTTPClient do
 
   def process_response({:ok, %{status: status, body: body}}, opts) when status in 200..299 do
     serializer = Keyword.get(opts, :serializer, Jason)
-    body |> serializer.decode!(keys: :atoms) |> then(&{:ok, %{status: status, body: &1}})
+    body |> serializer.decode!(opts) |> then(&{:ok, %{status: status, body: &1}})
   rescue
     e ->
       {:error,
@@ -134,7 +132,7 @@ defmodule VCUtils.HTTPClient do
   def process_response({:ok, %{status_code: status, body: body}}, opts)
       when status in 200..299 do
     serializer = Keyword.get(opts, :serializer, Jason)
-    body |> serializer.decode!(keys: :atoms) |> then(&{:ok, %{status: status, body: &1}})
+    body |> serializer.decode!(opts) |> then(&{:ok, %{status: status, body: &1}})
   rescue
     e ->
       {:error,
@@ -147,7 +145,7 @@ defmodule VCUtils.HTTPClient do
 
     {:error,
      response.body
-     |> serializer.decode!(keys: :atoms)
+     |> serializer.decode!(opts)
      |> then(&%{status: status, body: &1})}
   rescue
     e ->

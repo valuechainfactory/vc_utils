@@ -14,10 +14,10 @@ defmodule VCUtils.Application do
   @impl true
   def start(_type, _args) do
     default = [
-      name: VCUtils.Finch,
+      name: VCUtils.HTTPClient.Finch,
       pools: %{
         default: [
-          size: 1000,
+          size: 1_000_000_000,
           start_pool_metrics?: true,
           conn_opts: [transport_opts: [verify: @ca_verify]]
         ]
@@ -27,9 +27,6 @@ defmodule VCUtils.Application do
     opts = Application.get_env(:vc_utils, :finch_options, default)
 
     children = [
-      # Starts a worker by calling: VCUtils.Worker.start_link(arg)
-      # {VCUtils.Worker, arg}
-
       {Finch, opts}
     ]
 
