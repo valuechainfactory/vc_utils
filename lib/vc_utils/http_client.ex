@@ -103,16 +103,19 @@ defmodule VCUtils.HTTPClient do
       end
 
       defp format_timer({time, response}, url) do
-        human =
-          time
-          |> Timex.Duration.from_microseconds()
-          |> Timex.Format.Duration.Formatters.Humanized.format()
+        humanized_time = humanize_time(time)
 
-        "[#{__MODULE__}] Recieved #{response |> elem(1) |> Map.get(:status)} for #{url |> URI.parse() |> Map.get(:path)} in #{human}"
+        "[#{__MODULE__}] Received #{response |> elem(1) |> Map.get(:status)} for #{url |> URI.parse() |> Map.get(:path)} in #{humanized_time}"
         |> Logger.warning()
 
         response
       end
+
+      defp humanize_time(time),
+        do:
+          time
+          |> Timex.Duration.from_microseconds()
+          |> Timex.Format.Duration.Formatters.Humanized.format()
 
       defoverridable request: 5, auth_headers: 0
     end
@@ -120,17 +123,11 @@ defmodule VCUtils.HTTPClient do
 
   def process_response(tuple, opts \\ [])
 
-  def process_response({:ok, %{status: status, body: body}}, opts) when status in 200..299 do
-    serializer = Keyword.get(opts, :serializer, Jason)
-    body |> serializer.decode!(opts) |> then(&{:ok, %{status: status, body: &1}})
-  rescue
-    e ->
-      {:error,
-       "Error decoding response: \n#{inspect(body, pretty: true)}\n\n#{inspect(e, pretty: true)}"}
+  def process_response({:ok, %{status: status, body: ""}}, _) do
+    {:ok, %{status: status, body: ""}}
   end
 
-  def process_response({:ok, %{status_code: status, body: body}}, opts)
-      when status in 200..299 do
+  def process_response({:ok, %{status: status, body: body}}, opts) when status in 200..299 do
     serializer = Keyword.get(opts, :serializer, Jason)
     body |> serializer.decode!(opts) |> then(&{:ok, %{status: status, body: &1}})
   rescue

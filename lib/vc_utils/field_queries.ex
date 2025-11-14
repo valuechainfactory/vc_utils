@@ -256,8 +256,9 @@ defmodule VCUtils.FieldQueries do
       # Without binding (uses default binding)
       def unquote(name)(queryable \\ __MODULE__, start_and_end_dates, binding \\ nil)
 
-      def unquote(name)(queryable, start_and_end_dates, _binding) when start_and_end_dates in [nil, ""],
-        do: queryable
+      def unquote(name)(queryable, start_and_end_dates, _binding)
+          when start_and_end_dates in [nil, ""],
+          do: queryable
 
       def unquote(name)(queryable, %{start_date: nil, end_date: nil}, _binding), do: queryable
 
@@ -277,15 +278,18 @@ defmodule VCUtils.FieldQueries do
       end
 
       # With named binding
-      def unquote(name)(queryable, %{start_date: start_date, end_date: nil}, binding) when is_atom(binding) do
+      def unquote(name)(queryable, %{start_date: start_date, end_date: nil}, binding)
+          when is_atom(binding) do
         from(q in queryable, where: field(as(^binding), ^unquote(field)) >= ^start_date)
       end
 
-      def unquote(name)(queryable, %{start_date: nil, end_date: end_date}, binding) when is_atom(binding) do
+      def unquote(name)(queryable, %{start_date: nil, end_date: end_date}, binding)
+          when is_atom(binding) do
         from(q in queryable, where: field(as(^binding), ^unquote(field)) <= ^end_date)
       end
 
-      def unquote(name)(queryable, %{start_date: start_date, end_date: end_date}, binding) when is_atom(binding) do
+      def unquote(name)(queryable, %{start_date: start_date, end_date: end_date}, binding)
+          when is_atom(binding) do
         from(q in queryable,
           where: field(as(^binding), ^unquote(field)) >= ^start_date,
           where: field(as(^binding), ^unquote(field)) <= ^end_date
@@ -346,9 +350,14 @@ defmodule VCUtils.FieldQueries do
 
       def unquote(name)(queryable \\ __MODULE__, term, binding \\ nil) do
         case term do
-          t when t in [true, "true"] -> apply(__ENV__.module, unquote(truthy_name), [queryable, binding])
-          t when t in [false, "false"] -> apply(__ENV__.module, unquote(falsy_name), [queryable, binding])
-          _ -> queryable
+          t when t in [true, "true"] ->
+            apply(__ENV__.module, unquote(truthy_name), [queryable, binding])
+
+          t when t in [false, "false"] ->
+            apply(__ENV__.module, unquote(falsy_name), [queryable, binding])
+
+          _ ->
+            queryable
         end
       end
     end
