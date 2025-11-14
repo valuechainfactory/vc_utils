@@ -123,8 +123,12 @@ defmodule VCUtils.HTTPClient do
 
   def process_response(tuple, opts \\ [])
 
-  def process_response({:ok, %{status: status, body: ""}}, _) do
+  def process_response({:ok, %{status: status, body: ""}}, _) when status in 200..299 do
     {:ok, %{status: status, body: ""}}
+  end
+
+  def process_response({:ok, %{status: status, body: ""}}, _) do
+    {:error, %{status: status, body: ""}}
   end
 
   def process_response({:ok, %{status: status, body: body}}, opts) when status in 200..299 do

@@ -18,10 +18,7 @@ defmodule SampleHTTPClientTest do
 
   # Setup Finch for HTTP requests
   setup_all do
-    # Load the SampleAPIClient module
-    Code.require_file("sample_api_client.ex", __DIR__)
-
-    # Logger.configure(level: :warning)
+    Logger.configure(level: :warning)
 
     # Start Finch or use existing one
     case Finch.start_link(name: VCUtils.HTTPClient.Finch) do
@@ -201,6 +198,13 @@ defmodule SampleHTTPClientTest do
       assert is_atom(response.body |> Map.keys() |> List.first())
       assert Map.has_key?(response.body, :id)
       assert Map.has_key?(response.body, :title)
+    end
+
+    test "bypassed JSON decoding when response is empty" do
+      assert {:ok, response} = SampleAPIClient.empty_response()
+
+      assert response.status == 204
+      assert response.body == ""
     end
 
     test "measure request timing" do

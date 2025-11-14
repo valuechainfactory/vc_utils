@@ -88,4 +88,12 @@ defmodule SampleAPIClient do
   def get_invalid_endpoint do
     request(:get, "#{@base_url}/invalid-endpoint", nil, auth_headers())
   end
+
+  @doc """
+  Test bypass decoding for no context or empty responses
+  """
+  def empty_response do
+    url = "https://httpbin.org/status/204"
+    request(:get, url, nil, auth_headers())
+  end
 end
