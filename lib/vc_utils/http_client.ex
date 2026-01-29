@@ -111,7 +111,8 @@ defmodule VCUtils.HTTPClient do
           |> case do
             %{status: status} -> status
             "" -> "an empty string response"
-            _ -> "an unknown status"
+            error when is_binary(error) -> error
+            any -> inspect(any)
           end
 
         "[#{__MODULE__}] Received #{status} for #{url |> URI.parse() |> Map.get(:path)} in #{humanized_time}"
