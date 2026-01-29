@@ -105,7 +105,16 @@ defmodule VCUtils.HTTPClient do
       defp format_timer({time, response}, url) do
         humanized_time = humanize_time(time)
 
-        "[#{__MODULE__}] Received #{response |> elem(1) |> Map.get(:status)} for #{url |> URI.parse() |> Map.get(:path)} in #{humanized_time}"
+        status =
+          response
+          |> elem(1)
+          |> case do
+            %{status: status} -> status
+            "" -> "an empty string response"
+            _ -> "an unknown status"
+          end
+
+        "[#{__MODULE__}] Received #{status} for #{url |> URI.parse() |> Map.get(:path)} in #{humanized_time}"
         |> Logger.warning()
 
         response
