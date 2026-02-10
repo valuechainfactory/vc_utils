@@ -378,16 +378,18 @@ defmodule VCUtils.FieldQueries do
         from(q in queryable, where: field(q, ^unquote(field)) in ^fields)
       end
 
-      def unquote(name)(queryable, field, nil),
-        do: apply(__ENV__.module, unquote(name), [queryable, [field], nil])
+      def unquote(name)(queryable, field, nil) do
+        from(q in queryable, where: field(q, ^unquote(field)) == ^field)
+      end
 
       # With named binding
       def unquote(name)(queryable, [_ | _] = fields, binding) when is_atom(binding) do
         from(q in queryable, where: field(as(^binding), ^unquote(field)) in ^fields)
       end
 
-      def unquote(name)(queryable, field, binding) when is_atom(binding),
-        do: apply(__ENV__.module, unquote(name), [queryable, [field], binding])
+      def unquote(name)(queryable, field, binding) when is_atom(binding) do
+        from(q in queryable, where: field(as(^binding), ^unquote(field)) == ^field)
+      end
     end
   end
 
