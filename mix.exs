@@ -27,10 +27,10 @@ defmodule VCUtils.MixProject do
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
       # -----
 
-      {:ecto, "~> 3.12"},
-      {:ecto_sql, "~> 3.12"},
+      {:ecto, "~> 3.13"},
+      {:ecto_sql, "~> 3.13"},
       {:jason, "~> 1.4"},
-      {:finch, "~> 0.19"},
+      {:finch, "~> 0.21"},
       {:timex, "~> 3.7"}
     ]
   end

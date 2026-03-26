@@ -141,22 +141,34 @@ defmodule VCUtils.HTTPClient do
     {:error, %{status: status, body: ""}}
   end
 
-  def process_response({:ok, %{status: status, body: body}}, opts) when status in 200..299 do
+  def process_response({:ok, %{status: status, body: body} = response}, opts)
+      when status in 200..299 do
     serializer = Keyword.get(opts, :serializer, Jason)
     body |> serializer.decode!(opts) |> then(&{:ok, %{status: status, body: &1}})
   rescue
     e ->
-      {:error,
-       "Error decoding response: \n#{inspect(body, pretty: true)}\n\n#{inspect(e, pretty: true)}"}
+      error = """
+      #{inspect(body, pretty: true)}
+      ##{Exception.format(:error, e, __STACKTRACE__)}
+      """
+
+      Logger.error("[#{__MODULE__}] Error decoding response: \n#{error}")
+      {:error, response}
   end
 
-  def process_response({:ok, %{status_code: status, body: body}}, opts) when status in 200..299 do
+  def process_response({:ok, %{status_code: status, body: body} = response}, opts)
+      when status in 200..299 do
     serializer = Keyword.get(opts, :serializer, Jason)
     body |> serializer.decode!(opts) |> then(&{:ok, %{status: status, body: &1}})
   rescue
     e ->
-      {:error,
-       "Error decoding response: \n#{inspect(body, pretty: true)}\n\n#{inspect(e, pretty: true)}"}
+      error = """
+      #{inspect(body, pretty: true)}
+      ##{Exception.format(:error, e, __STACKTRACE__)}
+      """
+
+      Logger.error("[#{__MODULE__}] Error decoding response: \n#{error}")
+      {:error, response}
   end
 
   def process_response({:ok, response}, opts) do
@@ -169,11 +181,13 @@ defmodule VCUtils.HTTPClient do
      |> then(&%{status: status, body: &1})}
   rescue
     e ->
-      Logger.error(
-        "[#{__MODULE__}] Error decoding response: \n#{inspect(response.body, pretty: true)}\n\n#{inspect(e, pretty: true)}"
-      )
+      error = """
+      #{inspect(response.body, pretty: true)}
+      ##{Exception.format(:error, e, __STACKTRACE__)}
+      """
 
-      {:error, Map.take(response, ~w(body status status_code))}
+      Logger.error("[#{__MODULE__}] Error decoding response: \n#{error}")
+      {:error, response}
   end
 
   def process_response({:error, %{reason: reason}}, _opts),
