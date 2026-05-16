@@ -7,7 +7,10 @@ defmodule VCUtils.RepoCrud do
   Example:
   ```elixir
     defmodule User do
-      use Utils.RepoCrud, repo: MyApp.Repo
+      use VCUtils.RepoCrud,
+        repo: MyApp.Repo,
+        read_only_repo: MyApp.RORepo, # optional - incase of a dedicated read only repo - cluster setup
+        write_only_repo: MyApp.Repo # optional - `:repo` assumed to be write repo
 
       schema "users" do
         field :username, :string
@@ -16,6 +19,7 @@ defmodule VCUtils.RepoCrud do
         ...
       end
 
+      # `def_crud` will define helper functions that will utilize the seperate ro and rw dbs if defined
       def_crud([
         :create,
         :get,
@@ -45,7 +49,7 @@ defmodule VCUtils.RepoCrud do
     end
 
     # modify
-    def modify(struct, attrs \\ %{}, otps \\ []) do
+    def modify(struct, attrs \\ %{}, opts \\ []) do
       struct
       |> __MODULE__.changeset(attrs)
       |> Repo.update(opts)
@@ -60,6 +64,8 @@ defmodule VCUtils.RepoCrud do
   defmacro __using__(opts) do
     quote location: :keep do
       @repo unquote(opts[:repo])
+      @ro_repo unquote(opts[:read_only_repo])
+      @rw_repo unquote(opts[:write_only_repo] || opts[:repo])
       import VCUtils.RepoCrud
     end
   end
@@ -73,22 +79,43 @@ defmodule VCUtils.RepoCrud do
       def unquote(action)(struct \\ %__MODULE__{}, attrs \\ %{}, opts \\ []) do
         struct
         |> __MODULE__.changeset(attrs)
-        |> @repo.insert(opts)
+        |> @rw_repo.insert(opts)
       end
 
       def unquote(:"#{action}!")(struct \\ %__MODULE__{}, attrs \\ %{}, opts \\ []) do
         struct
         |> __MODULE__.changeset(attrs)
-        |> @repo.insert!(opts)
+        |> @rw_repo.insert!(opts)
       end
     end
   end
 
   defp def_crud_action(:get = action) do
     quote location: :keep do
-      def unquote(action)(id), do: @repo.get(__MODULE__, id)
-      def unquote(:"#{action}!")(id), do: @repo.get!(__MODULE__, id)
-      def unquote(:"#{action}_by")(attrs) when is_map(attrs), do: @repo.get_by(__MODULE__, attrs)
+      def unquote(action)(id) do
+        repo = if @ro_repo, do: @ro_repo, else: @repo
+        repo.get(__MODULE__, id)
+      end
+
+      def unquote(:"#{action}!")(id) do
+        repo = if @ro_repo, do: @ro_repo, else: @repo
+        repo.get!(__MODULE__, id)
+      end
+
+      def unquote(:"#{action}_by")(attrs) when is_map(attrs) do
+        repo = if @ro_repo, do: @ro_repo, else: @repo
+        repo.get_by(__MODULE__, attrs)
+      end
+
+      def unquote(:all)(queryable \\ __MODULE__, opts \\ []) do
+        repo = if @ro_repo, do: @ro_repo, else: @repo
+        repo.all(queryable, opts)
+      end
+
+      def unquote(:one)(queryable \\ __MODULE__, opts \\ []) do
+        repo = if @ro_repo, do: @ro_repo, else: @repo
+        repo.one(queryable, opts)
+      end
     end
   end
 
@@ -97,38 +124,42 @@ defmodule VCUtils.RepoCrud do
       def unquote(action)(struct, attrs \\ %{}, opts \\ []) do
         struct
         |> __MODULE__.changeset(attrs)
-        |> @repo.update(opts)
+        |> @rw_repo.update(opts)
       end
 
       def unquote(:"#{action}!")(struct, attrs \\ %{}, opts \\ []) do
         struct
         |> __MODULE__.changeset(attrs)
-        |> @repo.update!(opts)
+        |> @rw_repo.update!(opts)
       end
     end
   end
 
   defp def_crud_action(:update = action) do
     quote location: :keep do
-      @deprecated "User :modify instead of :update"
+      @deprecated "Use :modify instead of :update"
       def unquote(action)(struct, attrs \\ %{}, opts \\ []) do
         struct
         |> __MODULE__.changeset(attrs)
-        |> @repo.update(opts)
+        |> @rw_repo.update(opts)
       end
 
       def unquote(:"#{action}!")(struct, attrs \\ %{}, opts \\ []) do
         struct
         |> __MODULE__.changeset(attrs)
-        |> @repo.update!(opts)
+        |> @rw_repo.update!(opts)
       end
     end
   end
 
   defp def_crud_action(:delete = action) do
     quote location: :keep do
-      def unquote(action)(struct) when is_struct(struct), do: @repo.delete(struct)
-      def unquote(action)(structs) when is_list(structs), do: @repo.delete_all(structs)
+      def unquote(action)(struct) when is_struct(struct), do: @rw_repo.delete(struct)
+
+      def unquote(action)(structs) when is_list(structs),
+        do: Enum.map(structs, &@rw_repo.delete(&1))
+
+      def unquote(action)(queryable), do: @rw_repo.delete_all(queryable)
     end
   end
 end
