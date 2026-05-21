@@ -64,7 +64,7 @@ defmodule VCUtils.RepoCrud do
   defmacro __using__(opts) do
     quote location: :keep do
       @repo unquote(opts[:repo])
-      @ro_repo unquote(opts[:read_only_repo])
+      @ro_repo unquote(opts[:read_only_repo] || opts[:repo])
       @rw_repo unquote(opts[:write_only_repo] || opts[:repo])
       import VCUtils.RepoCrud
     end
