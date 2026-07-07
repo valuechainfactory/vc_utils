@@ -31,7 +31,7 @@ defmodule VCUtils.MixProject do
       {:ecto_sql, "~> 3.13"},
       {:jason, "~> 1.4"},
       {:finch, "~> 0.21"},
-      {:timex, "~> 3.7"}
+      {:telemetry, "~> 1.0"}
     ]
   end
 end
